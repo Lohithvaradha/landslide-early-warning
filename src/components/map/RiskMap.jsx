@@ -144,7 +144,7 @@ export function RiskMap({
         {/* High performance CartoDB Dark Matter tile layer for dark operational theme */}
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          subdomains="abcd"
+           attribution='&copy; OpenStreetMap contributors'
           maxZoom={19}
         />
 
