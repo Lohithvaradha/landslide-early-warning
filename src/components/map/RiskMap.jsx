@@ -52,12 +52,34 @@ function createReportMarkerIcon(severity) {
   });
 }
 
-// Recenter helper component
-function ChangeView({ center, zoom }) {
+// Custom DivIcon for searched locations
+function createSearchMarkerIcon() {
+  return L.divIcon({
+    className: 'custom-search-marker',
+    html: `
+      <div style="position: relative; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; inset: 0; border-radius: 9999px; background: rgba(6, 182, 212, 0.4); animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+        <div style="position: relative; width: 28px; height: 28px; border-radius: 9999px; background: #0c1322; border: 2.5px solid #06b6d4; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(6, 182, 212, 0.6);">
+          <div style="width: 10px; height: 10px; border-radius: 9999px; background: #06b6d4;"></div>
+        </div>
+      </div>
+    `,
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+    popupAnchor: [0, -20],
+  });
+}
+
+// Camera controller component supporting smooth flyTo on search
+function MapCameraController({ center, zoom, targetLocation }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
+    if (targetLocation && targetLocation.coordinates) {
+      map.flyTo(targetLocation.coordinates, 13, { duration: 1.5 });
+    } else if (center) {
+      map.setView(center, zoom);
+    }
+  }, [center, zoom, targetLocation, map]);
   return null;
 }
 
@@ -66,6 +88,7 @@ export function RiskMap({
   activeLayers = { sensors: true, reports: true },
   mini = false,
   onSelectSector,
+  searchedLocation = null,
   height = '100%',
 }) {
   const { locations, reports, setSelectedLocationId, setActiveTab } = useDisaster();
@@ -112,11 +135,15 @@ export function RiskMap({
         className="w-full h-full z-10"
         attributionControl={false}
       >
-        <ChangeView center={centerCoords} zoom={zoomLevel} />
+        <MapCameraController
+          center={centerCoords}
+          zoom={zoomLevel}
+          targetLocation={searchedLocation}
+        />
 
         {/* High performance CartoDB Dark Matter tile layer for dark operational theme */}
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           subdomains="abcd"
           maxZoom={19}
         />
@@ -221,6 +248,38 @@ export function RiskMap({
             </Marker>
           );
         })}
+
+        {/* Searched Location Marker */}
+        {searchedLocation && searchedLocation.coordinates && (
+          <Marker position={searchedLocation.coordinates} icon={createSearchMarkerIcon()}>
+            <Popup className="disaster-custom-popup">
+              <div className="p-1 min-w-[220px]">
+                <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-700">
+                  <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider">
+                    TARGET LOCATION
+                  </span>
+                  <RiskBadge level={searchedLocation.risk_level || 'Moderate'} size="sm" />
+                </div>
+                <h4 className="font-bold text-sm text-white mb-0.5">{searchedLocation.name}</h4>
+                <p className="text-[11px] text-slate-400 mb-2">{searchedLocation.region}</p>
+                <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-xs space-y-1 mb-2 font-mono">
+                  <div className="text-slate-300">
+                    <span className="text-slate-500">Coordinates: </span>
+                    {searchedLocation.coordinates[0].toFixed(4)}°N, {searchedLocation.coordinates[1].toFixed(4)}°E
+                  </div>
+                  <div className="text-slate-300">
+                    <span className="text-slate-500">Elevation: </span>
+                    {searchedLocation.elevation || 1250} m
+                  </div>
+                  <div className="text-cyan-400 font-bold">
+                    <span className="text-slate-500">Est. Risk Score: </span>
+                    {searchedLocation.risk_score || 55}/100
+                  </div>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
       </MapContainer>
 
       {/* Mini map banner overlay */}

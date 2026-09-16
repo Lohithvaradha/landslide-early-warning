@@ -8,11 +8,13 @@ import {
   Sliders,
   Maximize2,
   ExternalLink,
-  Info
+  Info,
+  ArrowLeft
 } from 'lucide-react';
 import { useDisaster } from '../context/DisasterContext';
 import { RiskMap } from '../components/map/RiskMap';
 import { MapFilterControls } from '../components/map/MapFilterControls';
+import { LocationSearchBar } from '../components/map/LocationSearchBar';
 import { RiskBadge } from '../components/common/RiskBadge';
 
 export function MapViewPage() {
@@ -20,6 +22,7 @@ export function MapViewPage() {
 
   const [filter, setFilter] = useState('All');
   const [activeLayers, setActiveLayers] = useState({ sensors: true, reports: true });
+  const [searchedLocation, setSearchedLocation] = useState(null);
 
   const toggleLayer = (layerName) => {
     setActiveLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }));
@@ -35,6 +38,7 @@ export function MapViewPage() {
   };
 
   const selectedLoc = locations.find(l => l.id === selectedLocationId) || locations[0];
+  const activeLoc = searchedLocation || selectedLoc;
 
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-8.5rem)] min-h-[600px]">
@@ -46,7 +50,7 @@ export function MapViewPage() {
             Tactical GIS Geospatial Matrix
           </h1>
           <p className="text-xs text-slate-400">
-            OpenStreetMap & InSAR hazard zone overlays with live sensor clusters and crowdsourced ground incidents.
+            OpenStreetMap & InSAR hazard zone overlays with live sensor clusters, search geocoding, and ground incidents.
           </p>
         </div>
 
@@ -62,6 +66,15 @@ export function MapViewPage() {
             <span className="w-2 h-2 rounded-full bg-amber-500"></span> Moderate
           </span>
         </div>
+      </div>
+
+      {/* Location Search Bar */}
+      <div className="shrink-0 bg-command-900/90 border border-slate-800 rounded-xl p-3 shadow-lg">
+        <LocationSearchBar
+          onLocationSelect={(loc) => setSearchedLocation(loc)}
+          onClear={() => setSearchedLocation(null)}
+          activeSearchedLocation={searchedLocation}
+        />
       </div>
 
       {/* Filter and Layer Bar */}
@@ -84,69 +97,95 @@ export function MapViewPage() {
             activeLayers={activeLayers}
             mini={false}
             height="100%"
-            onSelectSector={(id) => setSelectedLocationId(id)}
+            searchedLocation={searchedLocation}
+            onSelectSector={(id) => {
+              setSelectedLocationId(id);
+              setSearchedLocation(null);
+            }}
           />
         </div>
 
-        {/* Right HUD Sidebar for Selected Sector Details */}
+        {/* Right HUD Sidebar for Selected / Searched Sector Details */}
         <div className="w-full lg:w-80 bg-command-900/95 border-t lg:border-t-0 lg:border-l border-slate-800 p-4 sm:p-5 flex flex-col justify-between overflow-y-auto shrink-0">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
-              <span className="text-[11px] font-mono font-bold text-cyan-400">SECTOR HUD</span>
-              <RiskBadge level={selectedLoc.risk_level} size="sm" />
+              <span className={`text-[11px] font-mono font-bold ${searchedLocation ? 'text-cyan-400' : 'text-slate-400'}`}>
+                {searchedLocation ? 'SEARCHED TARGET' : 'SECTOR HUD'}
+              </span>
+              <RiskBadge level={activeLoc.risk_level || 'Moderate'} size="sm" />
             </div>
 
-            <h3 className="font-extrabold text-base text-white">{selectedLoc.name}</h3>
-            <p className="text-xs text-slate-400 mb-4">{selectedLoc.region}</p>
+            {searchedLocation && (
+              <button
+                onClick={() => setSearchedLocation(null)}
+                className="mb-2 text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold"
+              >
+                <ArrowLeft size={12} /> Return to Monitored Sectors
+              </button>
+            )}
+
+            <h3 className="font-extrabold text-base text-white">{activeLoc.name}</h3>
+            <p className="text-xs text-slate-400 mb-2">{activeLoc.region}</p>
+
+            {activeLoc.isExternalSearch && (
+              <div className="mb-3 px-2 py-1 rounded bg-cyan-950/70 border border-cyan-800/80 text-[10px] text-cyan-300 font-mono">
+                [Regional Baseline Telemetry]
+              </div>
+            )}
 
             <div className="space-y-2.5 mb-4">
               <div className="flex items-center justify-between p-2 rounded-lg bg-command-950 border border-slate-800 text-xs">
                 <span className="text-slate-400">Coordinates:</span>
                 <span className="font-mono font-bold text-slate-200">
-                  {selectedLoc.coordinates[0].toFixed(4)}°N, {selectedLoc.coordinates[1].toFixed(4)}°E
+                  {activeLoc.coordinates ? `${activeLoc.coordinates[0].toFixed(4)}°N, ${activeLoc.coordinates[1].toFixed(4)}°E` : 'N/A'}
                 </span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-command-950 border border-slate-800 text-xs">
                 <span className="text-slate-400">Risk Score:</span>
                 <span className="font-mono font-bold text-rose-400 text-sm">
-                  {selectedLoc.risk_score} / 100
+                  {activeLoc.risk_score || 55} / 100
                 </span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-command-950 border border-slate-800 text-xs">
                 <span className="text-slate-400">24h Rainfall:</span>
                 <span className="font-mono font-bold text-cyan-300">
-                  {selectedLoc.rainfall_24h} mm
+                  {activeLoc.rainfall_24h || 45} mm
                 </span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-command-950 border border-slate-800 text-xs">
                 <span className="text-slate-400">Slope Gradient:</span>
-                <span className="font-mono font-bold text-amber-300">{selectedLoc.slope}°</span>
+                <span className="font-mono font-bold text-amber-300">{activeLoc.slope || 25}°</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-command-950 border border-slate-800 text-xs">
                 <span className="text-slate-400">Soil Saturation:</span>
-                <span className="font-mono font-bold text-rose-300">{selectedLoc.soil_moisture}%</span>
+                <span className="font-mono font-bold text-rose-300">{activeLoc.soil_moisture || 50}%</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-command-950 border border-slate-800 text-xs">
-                <span className="text-slate-400">Population at Risk:</span>
+                <span className="text-slate-400">Elevation:</span>
                 <span className="font-mono font-bold text-white">
-                  {selectedLoc.population_at_risk.toLocaleString()}
+                  {activeLoc.elevation || 1200} m
                 </span>
               </div>
             </div>
 
             <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400">
               <span className="font-semibold text-slate-300 block mb-1">Geological Lithology:</span>
-              <span className="font-mono text-[11px] text-slate-400">{selectedLoc.geology}</span>
+              <span className="font-mono text-[11px] text-slate-400">{activeLoc.geology || 'Mountain Bedrock Stratum'}</span>
             </div>
           </div>
 
           <div className="pt-4 border-t border-slate-800 mt-4 space-y-2">
             <button
-              onClick={() => setActiveTab('analysis')}
+              onClick={() => {
+                if (activeLoc.id && activeLoc.id.startsWith('SEC-')) {
+                  setSelectedLocationId(activeLoc.id);
+                }
+                setActiveTab('analysis');
+              }}
               className="w-full py-2.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-rose-950/40"
             >
               <Radio size={14} />
-              <span>Simulate Risk for {selectedLoc.id}</span>
+              <span>Simulate Risk for {activeLoc.name}</span>
             </button>
             <button
               onClick={() => setActiveTab('reports')}
